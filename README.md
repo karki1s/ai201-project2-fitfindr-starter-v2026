@@ -40,7 +40,9 @@
 ## What This Does
 
 <!-- Three or four sentences: what a user asks for, and what they get back. -->
-
+User asked for 'vintage graphic tee under $30' using `python app.py ask 'vintage graphic tee under $30'`
+It return following:
+The planning loop isn't built yet — see the TODO in agent.py.
 
 
 ---
