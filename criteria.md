@@ -33,8 +33,9 @@ If search_listings returns at least one listing, the loop always goes on to
 suggest_outfit and create_fit_card. An empty wardrobe doesn't break this path,
 because suggest_outfit returns general styling advice instead of failing. I didn't
 set 5 of 5 because search_listings is a plain keyword match. A query can describe
-something the catalogue has in words the listings don't use, so a query that should match can still come back empty and stop early.
----
+something the catalogue has in words the listings don't use, so a query that should match 
+can still come back empty and stop early.
+
 
 ## 2. An impossible query stops before the second tool
 
@@ -59,6 +60,7 @@ less than 5 of 5 would mean the branch itself is broken.
 Given a query that matches at least one listing, the item chosen from search results is the same item that reaches suggest_outfit and appears in the final response — 4 of 5 tries.
 
 **Why this target:**
+
 This catches a state bug that would otherwise look like a broken tool call. The search can succeed, the model can still answer, and the agent can still appear functional while quietly passing a different item than the one the user selected. I think a4 of 5 target is realistic because state mismatches are likely to happen when results are re ordered or a previous session value is reused.
 
 ---
@@ -68,6 +70,7 @@ This catches a state bug that would otherwise look like a broken tool call. The 
 For each fit card produced from a valid item, the card names the item, includes a price or price range, and gives a short caption describing the outfit — in at least 4 of 5 tries.
 
 **Why this target:**
+
 The model is allowed to vary in wording, so the criterion should not require identical phrasing. What matters is that the card is usable and specific: the user can tell what item is being recommended, whether it is affordable, and what the outfit is meant to be. This is a realistic target because the model sometimes skips details or produces generic text, but it should still include the core facts most of the time.
 
 ---
@@ -79,6 +82,7 @@ styling advice (not "" and not an exception) and the agent still returns a fit c
 — in at least 4 of 5 tries.
 
 **Why this target:**
+
 The switch to general advice happens in code, but the advice itself comes from the
 model. With no wardrobe pieces to name, it may return a one-line generic tip that
 never mentions the selected item, and the fit card built from it won't describe a
