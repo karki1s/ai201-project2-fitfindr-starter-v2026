@@ -29,6 +29,11 @@ tool calls and returns a fit card — in at least 4 of 5 tries.
      "my search is a plain keyword match and some phrasings will miss" is a
      real answer. -->
 
+If search_listings returns at least one listing, the loop always goes on to
+suggest_outfit and create_fit_card. An empty wardrobe doesn't break this path,
+because suggest_outfit returns general styling advice instead of failing. I didn't
+set 5 of 5 because search_listings is a plain keyword match. A query can describe
+something the catalogue has in words the listings don't use, so a query that should match can still come back empty and stop early.
 ---
 
 ## 2. An impossible query stops before the second tool
@@ -40,63 +45,44 @@ Given a query that matches no listings, the agent stops before calling
 <!-- Why is 5 of 5 reasonable here when criterion 1 isn't? What's different
      about this path? -->
 
----
-
-## 3. Something about state
-
-<!-- YOU WRITE THIS ONE.
-
-     How would you know that the item your search found is the same item the
-     next tool received? Name something countable or observable.
-
-     This is the criterion people find hardest, because state failure doesn't
-     look like state failure — it looks like a tool problem. Something that
-     compares session["selected_item"] against what actually reached
-     suggest_outfit is the shape you're after. -->
-
-
-
-**Why this target:**
-
-
+The stop is a plain check in run_agent. if search_listings returns an empty list,
+we will set session["error"] and return before suggest_outfit or create_fit_card runs.
+That check involves no keyword guessing and no model output, so the same empty result
+takes the same path every time. The weakness behind criterion 1 doesn't apply here:
+a query built to match nothing can't be missed by a loose keyword match. Anything
+less than 5 of 5 would mean the branch itself is broken. 
 
 ---
 
-## 4. Something about the fit card
+## 3. The selected item is the same item passed to the next tool
 
-<!-- YOU WRITE THIS ONE.
-
-     The fit card calls a model, so the same input can produce different words
-     each time. That's not a bug — it's the nature of the tool. So what would
-     make it acceptable?
-
-     Think about what you'd actually be unhappy to see. A caption that never
-     mentions the price? Two different items producing the same opening
-     sentence? A card longer than a caption anyone would post? Any of those can
-     be turned into a number. -->
-
-
+Given a query that matches at least one listing, the item chosen from search results is the same item that reaches suggest_outfit and appears in the final response — 4 of 5 tries.
 
 **Why this target:**
-
-
+This catches a state bug that would otherwise look like a broken tool call. The search can succeed, the model can still answer, and the agent can still appear functional while quietly passing a different item than the one the user selected. I think a4 of 5 target is realistic because state mismatches are likely to happen when results are re ordered or a previous session value is reused.
 
 ---
 
-## 5. Your choice
+## 4. The fit card includes the key identifying details
 
-<!-- YOU WRITE THIS ONE TOO.
-
-     Pick something you actually care about getting right. Speed, the empty
-     wardrobe path, what happens when the model can't be reached, whether the
-     search respects a price ceiling — anything, as long as it names a number
-     or an observable outcome. -->
-
-
+For each fit card produced from a valid item, the card names the item, includes a price or price range, and gives a short caption describing the outfit — in at least 4 of 5 tries.
 
 **Why this target:**
+The model is allowed to vary in wording, so the criterion should not require identical phrasing. What matters is that the card is usable and specific: the user can tell what item is being recommended, whether it is affordable, and what the outfit is meant to be. This is a realistic target because the model sometimes skips details or produces generic text, but it should still include the core facts most of the time.
 
+---
 
+## 5. An empty wardrobe still produces a fit card
+
+Given a matching query and get_empty_wardrobe(), suggest_outfit returns general
+styling advice (not "" and not an exception) and the agent still returns a fit card
+— in at least 4 of 5 tries.
+
+**Why this target:**
+The switch to general advice happens in code, but the advice itself comes from the
+model. With no wardrobe pieces to name, it may return a one-line generic tip that
+never mentions the selected item, and the fit card built from it won't describe a
+real outfit. I picked 4 of 5 which allows for that without letting a real bug slide.
 
 ---
 
