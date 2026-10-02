@@ -139,7 +139,7 @@ to create_fit_card.
 
 **One full query**
 
-Run before run_agent was implemented in agent.py file
+Ran before run_agent was implemented in agent.py file
 ```
 $ python app.py ask 'graphic tee under $30'
 
@@ -148,7 +148,7 @@ The planning loop isn't built yet — see the TODO in agent.py.
 0 model calls this session
 
 ```
-Run after run_agent was implemented agent.py file
+Ran afterrun_agent was implemented agent.py file as part of milestone-5
 ```
 $ python app.py ask 'graphic tee under $30'
 
@@ -201,7 +201,7 @@ Scored these vintage Levi's 501s on Depop for just $38 and I am never taking the
 **Moment 1**
 
 - *What I asked for:*
-I alked to explain me overall structure of the code base and also ask me to outline and check what I have implemented
+I asked to explain me overall structure of the code base and also ask me to outline and check what I have implemented
 - *What came back:*
 It explain overall code base, suggest certain thing for me to change for the run_agent
 - *What I changed:*
