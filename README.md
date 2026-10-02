@@ -139,6 +139,7 @@ to create_fit_card.
 
 **One full query**
 
+Run before run_agent was implemented in agent.py file
 ```
 $ python app.py ask 'graphic tee under $30'
 
@@ -147,6 +148,21 @@ The planning loop isn't built yet — see the TODO in agent.py.
 0 model calls this session
 
 ```
+Run after run_agent was implemented agent.py file
+```
+$ python app.py ask 'graphic tee under $30'
+
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+
+  Outfit:   **Outfit 1: Early 2000s Brat**
+Layer the Y2K baby tee under the vintage black denim jacket, paired with the baggy straight-leg jeans (cinched with the brown leather belt). Finish it off with the chunky white sneakers and the black crossbody bag for a high-contrast, nostalgic street look.
+
+**Outfit 2: Soft Contrast**
+Tuck the Y2K baby tee into the wide-leg khaki trousers, worn with the brown leather belt to define the waist. Throw the black cropped zip hoodie loosely over your shoulders and ground the pastels with the black combat boots.
+
+  Fit card: Finally caved and snagged this butterfly baby tee for just $18 on depop, and honestly I'm obsessed. I've been living in it layered under my black denim jacket with baggy jeans for that ultimate early 2000s brat energy. Such a good little staple for the rotation.
+
+2 model calls this session, 487 prompt + 191 output tokens
 
 **The three tools, tested one at a time**
 
@@ -185,8 +201,11 @@ Scored these vintage Levi's 501s on Depop for just $38 and I am never taking the
 **Moment 1**
 
 - *What I asked for:*
+I alked to explain me overall structure of the code base and also ask me to outline and check what I have implemented
 - *What came back:*
+It explain overall code base, suggest certain thing for me to change for the run_agent
 - *What I changed:*
+Applied some suggestion and verify the codebase and run the tests
 
 **Moment 2**
 

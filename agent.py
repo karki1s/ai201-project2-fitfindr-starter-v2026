@@ -13,6 +13,8 @@ Build and test your three tools in `tools.py` first. Then come here.
     python agent.py          runs both example paths below
 """
 
+import re
+
 import config
 import trace
 from tools import search_listings, suggest_outfit, create_fit_card
@@ -46,6 +48,63 @@ def new_session(query: str, wardrobe: dict) -> dict:
         "error": None,               # set when the run ended early
     }
 
+
+# ── query parsing ────────────────────────────────────────────────────────────
+
+_PRICE = re.compile(r"(?:under|below|less than|max|up to)\s*\$?\s*(\d+(?:\.\d+)?)|\$(\d+(?:\.\d+)?)", re.I)
+_SIZE = re.compile(r"\bsize\s+(us\s*\d+(?:\.\d+)?|w\d+(?:\s*l\d+)?|[a-z]+(?:/[a-z]+)?)\b", re.I)
+_FILLER = re.compile(r"\b(?:i'?m|i am|looking for|i want|want|need|find me|show me|a|an|some|in|for)\b", re.I)
+
+
+def parse_query(query: str) -> dict:
+    """
+    Pull a description, size and max_price out of a plain-language query, by regex.
+
+    "vintage graphic tee under $30, size M"
+        -> {"description": "vintage graphic tee", "size": "M", "max_price": 30.0}
+
+    size and max_price are None when the query doesn't mention them.
+    """
+    max_price = None
+    price_match = _PRICE.search(query)
+    if price_match:
+        max_price = float(price_match.group(1) or price_match.group(2))
+        query = query[:price_match.start()] + " " + query[price_match.end():]
+
+    size = None
+    size_match = _SIZE.search(query)
+    if size_match:
+        size = size_match.group(1).upper()
+        query = query[:size_match.start()] + " " + query[size_match.end():]
+
+    description = _FILLER.sub(" ", query)
+    description = " ".join(re.sub(r"[^\w\s'-]", " ", description).split())
+
+    return {"description": description, "size": size, "max_price": max_price}
+
+
+def _no_results_message(parsed: dict) -> str:
+    """Suggest the user change their query when search_listings returns nothing."""
+    tried: list[str] = []
+    suggestions: list[str] = []
+
+    tried.append(f"description {parsed['description']!r}")
+    if parsed["size"]:
+        tried.append(f"size {parsed['size']}")
+    if parsed["max_price"] is not None:
+        tried.append(f"max price ${parsed['max_price']:g}")
+    searched: str = ", ".join(tried)
+    suggestions.append("try broader words: 'jacket' finds more than 'leather jacket'")
+    if parsed["size"]:
+        suggestions.append(f"drop the size you used {parsed['size']!r} and try a neighboring one")
+    if parsed["max_price"] is not None:
+        suggestions.append(f"raise the price ceiling above the ${parsed['max_price']:g}")
+    query_feedback: str = "; ".join(suggestions)
+
+    return (
+        f"Nothing in the listings matched {searched}.\n"
+        f"Things you can change and try: {query_feedback}."
+    )
 
 # ── planning loop ─────────────────────────────────────────────────────────────
 
@@ -106,10 +165,43 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         than a stack trace. The import is already at the top of this file.
     """
     session = new_session(query, wardrobe)
+    steps = 0
 
-    # TODO: delete these two lines and build the loop.
-    session["error"] = "The planning loop isn't built yet — see the TODO in agent.py."
-    return session
+    # Each pass looks at what the session already holds and picks the next step.
+    while True:
+        steps += 1
+        trace.check_iterations(steps)
+
+        if not session["parsed"]:
+            session["parsed"] = parse_query(query)
+
+        elif session["selected_item"] is None:
+            parsed = session["parsed"]
+            results = search_listings(
+                parsed["description"],
+                size=parsed["size"],
+                max_price=parsed["max_price"],
+            )
+            session["search_results"] = results
+
+            # The branch: nothing to style, so stop before suggest_outfit.
+            if not results:
+                session["error"] = _no_results_message(parsed)
+                return session
+            session["selected_item"] = results[0]
+
+        elif session["outfit_suggestion"] is None:
+            session["outfit_suggestion"] = suggest_outfit(
+                session["selected_item"], session["wardrobe"]
+            )
+
+        elif session["fit_card"] is None:
+            session["fit_card"] = create_fit_card(
+                session["outfit_suggestion"], session["selected_item"]
+            )
+
+        else:
+            return session
 
 
 # ── running it directly ───────────────────────────────────────────────────────
