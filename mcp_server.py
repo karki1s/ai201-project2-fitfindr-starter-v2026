@@ -67,37 +67,32 @@ from tools import search_listings as _search_listings_impl  # noqa: F401 — you
 mcp = FastMCP("fitfindr", log_level="WARNING")
 
 
-# ── TODO: uncomment and fill this in ──────────────────────────────────────────
-#
-# @mcp.tool()
-# def search_listings(
-#     description: str,
-#     size: str | None = None,
-#     max_price: float | None = None,
-# ) -> list[dict]:
-#     """
-#     <-- YOUR DESCRIPTION GOES HERE.
-#
-#         One or two sentences. What does this tool do, what does it need, and
-#         what does it give back when it finds nothing? Written for a reader
-#         who cannot see the code.
-#     """
-#     return _search_listings_impl(description, size, max_price)
-#
-# ──────────────────────────────────────────────────────────────────────────────
-#
-# Two notes on the block above.
-#
-# The registered name is the *function* name — so the block above registers
-# "search_listings", which is exactly what call_tool("search_listings", ...)
-# asks for. That is also why the import at the top of this file brings the real
-# implementation in under an alias: without it, the registered function and the
-# one it calls would be the same name, and the tool would call itself.
-#
-# FastMCP builds the input schema from your type hints, which is why the hints
-# are not optional here. `description: str` becomes a required string;
-# `max_price: float | None = None` becomes an optional number. Getting these
-# wrong is the most common reason a call is rejected.
+@mcp.tool()
+def search_listings(
+    description: str,
+    size: str | None = None,
+    max_price: float | None = None,
+) -> list[dict]:
+    """
+    Search a fixed catalogue of secondhand clothing listings.
+
+    Args:
+        description: keywords for the item, e.g. "vintage graphic tee".
+        size: size to filter by, case-insensitive, matched as whole words:
+              "M" matches "M", "S/M" and "M/L" but not "XL"; "US 9" for shoes,
+              "W30" for jeans. Omit to allow any size.
+        max_price: highest price in US dollars, inclusive (30 allows a $30.00
+                   item). Omit for no price limit.
+
+    Returns a list of listing dicts, best keyword match first. Each
+    has: id, title, description, category, style_tags (list of str), size,
+    condition, price (float, USD), colors (list of str), brand (str or null —
+    usually null), platform.
+
+    Returns an empty list [] when nothing matches. That is a normal result,
+    not an error.
+    """
+    return _search_listings_impl(description, size, max_price)
 
 
 if __name__ == "__main__":

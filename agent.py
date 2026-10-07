@@ -19,6 +19,7 @@ import config
 import trace
 from tools import search_listings, suggest_outfit, create_fit_card
 from generate import ModelUnavailable
+from mcp_client import call_tool
 
 
 # ── session state ─────────────────────────────────────────────────────────────
@@ -177,11 +178,11 @@ def run_agent(query: str, wardrobe: dict) -> dict:
 
         elif session["selected_item"] is None:
             parsed = session["parsed"]
-            results = search_listings(
-                parsed["description"],
-                size=parsed["size"],
-                max_price=parsed["max_price"],
-            )
+            results = call_tool("search_listings", {
+                "description": parsed["description"],
+                "size": parsed["size"],
+                "max_price": parsed["max_price"],
+            })
             session["search_results"] = results
 
             # The branch: nothing to style, so stop before suggest_outfit.
