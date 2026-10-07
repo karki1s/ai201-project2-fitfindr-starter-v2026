@@ -309,6 +309,53 @@ behaved differently afterwards. If the rewire didn't work, say exactly where it
 broke — the error text and the last thing that worked. That earns the point in
 full. -->
 
+```
+I first register the search_listing tool to the mcp_server. After it I verify the tool is available or not using below command: 
+
+```
+$python mcp_client.py 
+Asking mcp_server.py what it offers…
+
+  search_listings
+    
+Search a fixed catalogue of secondhand clothing listings.
+
+Args:
+    description: keywords for the item, e.g. "vintage graphic tee".
+    size: size to filter by, case-insensitive, matched as whole words:
+          "M" matches "M", "S/M" and "M/L" but not "XL"; "US 9" for shoes,
+          "W30" for jeans. Omit to allow any size.
+    max_price: highest price in US dollars, inclusive (30 allows a $30.00
+               item). Omit for no price limit.
+
+Returns a list of listing dicts, best keyword match first. Each
+has: id, title, description, category, style_tags (list of str), size,
+condition, price (float, USD), colors (list of str), brand (str or null —
+usually null), platform.
+
+Returns an empty list [] when nothing matches. That is a normal result,
+not an error.
+
+    - description: string
+    - size: string  (optional)
+    - max_price: number  (optional)
+```
+Then I switched the direct tool call to MCP call_tool from mcp_client and verify it works using bellow command. Rewrite worked for me verified that the search_listings tool was called via tool_call.
+```
+$ python app.py ask 'vintage graphic tee under $30'
+
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+
+  Outfit:   **Outfit 1: Y2K Brat**
+Pair the baby tee with your *Baggy straight-leg jeans, dark wash*. Cinch the waist with the *Brown leather belt*, throw the *Black cropped zip hoodie* over your shoulders, and finish with *Chunky white sneakers* and the *Black crossbody bag*.
+
+**Outfit 2: Soft Contrast**
+Tuck the baby tee into the *Wide-leg khaki trousers* paired with the *Brown leather belt*. Layer the *Vintage black denim jacket* on top and ground the look with *Black combat boots* and the *Black crossbody bag*.
+
+  Fit card: scored this little butterfly baby tee on depop for just $18 and I'm obsessed. honestly living out my ultimate y2k brat era pairing it with baggy dark-wash jeans and throwing that cropped zip hoodie over my shoulders. such an easy 2000s mood.
+
+2 model calls this session, 486 prompt + 185 output tokens
+```
 
 
 ---
