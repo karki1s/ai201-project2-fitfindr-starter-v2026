@@ -168,41 +168,60 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     session = new_session(query, wardrobe)
     steps = 0
 
-    # Each pass looks at what the session already holds and picks the next step.
-    while True:
-        steps += 1
-        trace.check_iterations(steps)
+    try:
+        while True:
+            steps += 1
+            trace.check_iterations(steps)
 
-        if not session["parsed"]:
-            session["parsed"] = parse_query(query)
+            if not session["parsed"]:
+                session["parsed"] = parse_query(query)
+                trace.step("parse_query", inputs=query, returned=str(session["parsed"]))
 
-        elif session["selected_item"] is None:
-            parsed = session["parsed"]
-            results = call_tool("search_listings", {
-                "description": parsed["description"],
-                "size": parsed["size"],
-                "max_price": parsed["max_price"],
-            })
-            session["search_results"] = results
+            elif session["selected_item"] is None:
+                parsed = session["parsed"]
+                results = call_tool("search_listings", {
+                    "description": parsed["description"],
+                    "size": parsed["size"],
+                    "max_price": parsed["max_price"],
+                })
+                session["search_results"] = results
 
-            # The branch: nothing to style, so stop before suggest_outfit.
-            if not results:
-                session["error"] = _no_results_message(parsed)
+                # The branch: nothing to style, so stop before suggest_outfit.
+                if not results:
+                    session["error"] = _no_results_message(parsed)
+                    trace.step("search_listings", inputs=str(parsed), returned=[],
+                               note="branch: no results, stopping before suggest_outfit")
+                    return session
+                session["selected_item"] = results[0]
+                trace.step("search_listings", inputs=str(parsed), returned=results, 
+                           note=f"branch: {len(results)} found, selected {results[0]['title']!r}")
+
+            elif session["outfit_suggestion"] is None:
+                session["outfit_suggestion"] = suggest_outfit(
+                    session["selected_item"], session["wardrobe"]
+                )
+                trace.step("suggest_outfit", inputs=f"item={session['selected_item']['title']!r}, " 
+                           f"wardrobe={len(session['wardrobe'].get('items', []))} items", 
+                           returned=session["outfit_suggestion"])
+
+            elif session["fit_card"] is None:
+                session["fit_card"] = create_fit_card(
+                    session["outfit_suggestion"], session["selected_item"]
+                )
+                trace.step("create_fit_card",
+                           inputs=f"item={session['selected_item']['title']!r}, "
+                           f"outfit={session['outfit_suggestion'][:60]!r}…",
+                           returned=session["fit_card"])
+            else:
                 return session
-            session["selected_item"] = results[0]
-
-        elif session["outfit_suggestion"] is None:
-            session["outfit_suggestion"] = suggest_outfit(
-                session["selected_item"], session["wardrobe"]
-            )
-
-        elif session["fit_card"] is None:
-            session["fit_card"] = create_fit_card(
-                session["outfit_suggestion"], session["selected_item"]
-            )
-
-        else:
-            return session
+    except ModelUnavailable as exc:
+        found = session["selected_item"]
+        session["error"] = (
+            f"Couldn't reach the model, so no outfit or fit card was written. {exc}"
+            + (f" (The search itself worked — it found {found['title']!r}.)" if found else "")
+        )
+        #trace.step("model unavailable", note="stopping: " + str(exc))
+        return session
 
 
 # ── running it directly ───────────────────────────────────────────────────────

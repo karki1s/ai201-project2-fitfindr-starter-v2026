@@ -295,12 +295,48 @@ that produced it:
 **Happy path**
 
 ```
+$ python app.py ask 'black combat boots under $60' --trace
+[1] parse_query
+      in:  black combat boots under $60
+      out: {'description': 'black combat boots', 'size': None, 'max_price': 60.0}
+[2] search_listings
+      in:  {'description': 'black combat boots', 'size': None, 'max_price': 60.0}
+      out: 9 items: Oversized Flannel Shirt — Plaid Red/Black, Graphic Tee — 2003 Tour Bootleg Style, Platform Mary Janes — Black Patent … +6 more
+      →    branch: 9 found, selected 'Oversized Flannel Shirt — Plaid Red/Black'
+[3] suggest_outfit
+      in:  item='Oversized Flannel Shirt — Plaid Red/Black', wardrobe=10 items
+      out: **Outfit 1 (90s Grunge Layering):** Wear the white ribbed tank top tucked into the baggy straight-leg jeans, s…
+[4] create_fit_card
+      in:  item='Oversized Flannel Shirt — Plaid Red/Black', outfit='**Outfit 1 (90s Grunge Layering):** Wear the white r…
+      out: Scored this red and black flannel on thredUp for just $22 and I’m so obsessed. Totally leaning into that 90s g…
 
+  Found:    Oversized Flannel Shirt — Plaid Red/Black — $22.0 on thredUp
+
+  Outfit:   **Outfit 1 (90s Grunge Layering):** Wear the white ribbed tank top tucked into the baggy straight-leg jeans, secured with the brown leather belt. Layer the oversized red/black flannel shirt unbuttoned over top, and finish with the black combat boots and black crossbody bag.
+
+**Outfit 2 (Streetwear Contrast):** Pair the wide-leg khaki trousers with the black cropped zip hoodie. Throw the oversized red/black flannel shirt over the hoodie as an unbuttoned outer layer, and ground the look with the chunky white sneakers and black crossbody bag.
+
+  Fit card: Scored this red and black flannel on thredUp for just $22 and I’m so obsessed. Totally leaning into that 90s grunge vibe by throwing it unbuttoned over a white tank and baggy jeans, laced up with some chunky combat boots. It's giving effortless cool without even trying.
+
+2 model calls this session, 483 prompt + 184 output tokens
 ```
 
 **Empty search**
 
 ```
+$ python app.py ask 'Red sari under $10' --trace
+[1] parse_query
+      in:  Red sari under $10
+      out: {'description': 'Red sari', 'size': None, 'max_price': 10.0}
+[2] search_listings
+      in:  {'description': 'Red sari', 'size': None, 'max_price': 10.0}
+      out: [] (empty)
+      →    branch: no results, stopping before suggest_outfit
+
+  Nothing in the listings matched description 'Red sari', max price $10.
+Things you can change and try: try broader words: 'jacket' finds more than 'leather jacket'; raise the price ceiling above the $10.
+
+0 model calls this session
 
 ```
 
