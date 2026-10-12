@@ -363,14 +363,32 @@ empty wardrobe  (empty wardrobe)
 
 | # | Criterion | Target | Verdict | How I decided |
 |---|---|---|---|---|
-| 1 |  |  |  |  |
-| 2 |  |  |  |  |
-| 3 |  |  |  |  |
-| 4 |  |  |  |  |
-| 5 |  |  |  |  |
+| 1 | A matching query completes all three tools | 4 of 5 | MET (5/5) | Each try counted as PASS if the run didn't stop early and the session held an outfit suggestion and a fit card. All 5 did. |
+| 2 | An impossible query stops before the second tool | 5 of 5 | MET (5/5) | PASS if the trace ended at `search_listings` with `[] (empty)`, there was no `suggest_outfit` step, and the message named something to change. All 5 named broader words, a different size than XXS, and a price above $5. |
+| 3 | The selected item is the same item passed to the next tool | 4 of 5 | MET (5/5) | PASS if the first search result was the `selected_item`, the trace showed that same title going into `suggest_outfit` and `create_fit_card`, and the fit card described that item. It did in all 5. I counted shortened names like "bootleg tour tee" as the same item, because the price ($24) and platform (Depop) also matched. |
+| 4 | The fit card includes the key identifying details | 4 of 5 | MET (5/5) | PASS if the card named the denim jacket, gave a price, and described a specific outfit. All 5 said "$42 on Poshmark" and described a look such as double denim or 90s streetwear. |
+| 5 | An empty wardrobe still produces a fit card | 4 of 5 | MET (5/5) | PASS if the trace showed `wardrobe=0 items`, the outfit was non-empty general advice about the jacket, and a fit card came back. All 5 did. |
+
 
 **Diagnoses**
+No criterion missed. The log still showed two problems that my criteria were too loose to catch.
 
+1. Wrong item ranked first — in the tool (`search_listings`).
+For "vintage graphic tee", all 5 tries chose "Y2K Baby Tee — Butterfly Print" over
+"Graphic Tee — 2003 Tour Bootleg Style". All three tee listings matched all three
+query words (`vintage`, `graphic`, `tee`) somewhere in their text, so they tied at a
+score of 3. Python's sort is stable, so the tie kept file order, and the Baby Tee is
+listing 1 while the Graphic Tee is listing 5. The score counts a word found in the
+description the same as a word in the title. Criterion 1 passed because it only
+checks that all three tools ran, not that the best item was chosen.
+
+2. The fit card invents ownership — in the model's output (`create_fit_card` prompt).
+With an empty wardrobe, the cards say things like "I've been living in it over a satin
+slip dress and Sambas", which are clothes the user never said they own. `suggest_outfit`
+correctly gives general advice, but `create_fit_card` gets that advice as "how it's
+being styled" and the prompt asks for a first-person post, so the model writes the
+suggestions as things the user already did. The tool and the branch work; the prompt
+doesn't tell the model the pieces are suggestions.
 
 
 ---
