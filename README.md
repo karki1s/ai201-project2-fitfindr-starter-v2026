@@ -210,6 +210,7 @@ Applied some suggestion and verify the codebase and run the tests
 **Moment 2**
 
 - *What I asked for:*
+I used AI to verify my score for the Scenarios run result conditions. 
 - *What came back:*
 - *What I changed:*
 
@@ -573,10 +574,6 @@ me anything:
      you did. "I ran out of time" is fine if it's true. Pretending nothing is
      left is not. -->
 
-
-
-<!-- 
-
 No criterion is missed, but three things are still wrong:
 
 1. Ranking ties go to file order (`tools.py::search_listings`). The three tee
@@ -589,9 +586,13 @@ No criterion is missed, but three things are still wrong:
    general advice as "how it's being styled". Fix: tell the model these are
    suggestions, not pieces the user owns.
 3. My scenarios can't detect either problem. Each criterion runs one easy,
-   pre-checked query. The next step would be adding the tougher scenarios listed
-   above and re-running before changing any code, so a fix would have a failing
-   baseline to improve on.═════════════════════════════════════════════════════════════════════
+   pre checked query. The next step would be adding the tougher scenarios listed
+   above and rerunning before changing any code, so a fix would have a failing
+   baseline to improve on.
+
+
+<!-- 
+═════════════════════════════════════════════════════════════════════
 
      SUBMISSION CHECKLIST — unit 3
 
