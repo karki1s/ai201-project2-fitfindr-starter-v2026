@@ -517,24 +517,52 @@ Tuck the baby tee into the *Wide-leg khaki trousers* paired with the *Brown leat
      `python run_eval.py --label after` -->
 
 **What I changed:**
+Nothing. All five criteria were MET at 5/5 in the before-run, so no criterion had a
+miss to fix. I re-ran the same code with `python run_eval.py --label after` as a
+second measurement, to see whether the results were stable or the first run got
+lucky.
 
 **Which failure it was meant to fix:**
+None of the five criteria failed. My diagnoses found two real problems (the
+search ranks the wrong tee first, and the fit card invents clothes the user owns),
+but no criterion catches either one, so a fix for them wouldn't show up in this
+table. That is a weakness in my criteria and scenarios, explained below.
+
 
 ### Run Log — After
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. matching query completes | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. impossible query stops early | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. selected item carries through | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. fit card has item, price, vibe | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. empty wardrobe | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+
 
 **Did it help, and how do I know:**
 
 <!-- If it made things worse, say that. Honestly reported, that earns full
      credit and is more interesting than one that worked. -->
 
+There was no change, so there was nothing to help. The after-run matches the
+before-run: 25 of 25 tries passed, the same items were selected in every try, and
+the fit cards varied in wording but always named the item, its price, and the
+platform. What the second run does show is that my scenarios are too easy to tell
+me anything:
+
+- **One query per criterion.** Each criterion runs one fixed query 5 times.
+  `search_listings` is deterministic, so criteria 2 and 3 get the same search result
+  on all 5 tries. They can only ever score 0/5 or 5/5, and once the code works they
+  will always be 5/5.
+- **I chose queries I knew would match.** "denim jacket under $50" and "band tee
+  size L" were checked against the data before I wrote them in, so criteria 1, 3
+  and 4 never test a phrasing the keyword search might miss — which is the exact
+  weakness I named in criterion 1's "why this target".
+- **The criteria check that steps ran, not that they were right.** Criterion 1
+  passed while the agent picked "Y2K Baby Tee" for "vintage graphic tee" instead of
+  "Graphic Tee — 2003 Tour Bootleg Style". Criterion 5 passed while the fit cards
+  said "I've been living in it with…" about clothes the user doesn't own.
 
 
 ---
@@ -547,7 +575,23 @@ Tuck the baby tee into the *Wide-leg khaki trousers* paired with the *Brown leat
 
 
 
-<!-- ═════════════════════════════════════════════════════════════════════
+<!-- 
+
+No criterion is missed, but three things are still wrong:
+
+1. Ranking ties go to file order (`tools.py::search_listings`). The three tee
+   listings all score 3 for "vintage graphic tee", so whichever comes first in the
+   file wins. Fix: weight title matches higher than description matches. I didn't
+   make this change because no criterion was failing, so I had no target to
+   measure it against. In hindsight, I should have written a criterion for it.
+2. Fit cards invent ownership with an empty wardrobe
+   (`tools.py::create_fit_card`). The prompt asks for a first-person post and passes
+   general advice as "how it's being styled". Fix: tell the model these are
+   suggestions, not pieces the user owns.
+3. My scenarios can't detect either problem. Each criterion runs one easy,
+   pre-checked query. The next step would be adding the tougher scenarios listed
+   above and re-running before changing any code, so a fix would have a failing
+   baseline to improve on.═════════════════════════════════════════════════════════════════════
 
      SUBMISSION CHECKLIST — unit 3
 
