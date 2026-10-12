@@ -233,17 +233,112 @@ Applied some suggestion and verify the codebase and run the tests
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. matching query completes | 4 of 5 | PASS | PASS | PASS | PASS |PASS | MET (5/5) |
+| 2. impossible query stops early | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. selected item carries through | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. fit card has item, price, vibe | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. empty wardrobe | 4 of 5 | PASS | PASS | PASS | PASS |PASS  | MET (5/5) |
 
 **Real output from one try**, pasted as text, naming the file and function
 that produced it:
 
 ```
+matching query completes  (example wardrobe)
+  query: vintage graphic tee under $30
+[1] parse_query
+      in:  vintage graphic tee under $30
+      out: {'description': 'vintage graphic tee', 'size': None, 'max_price': 30.0}
+[2] search_listings
+      in:  {'description': 'vintage graphic tee', 'size': None, 'max_price': 30.0}
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+      →    branch: 10 found, selected 'Y2K Baby Tee — Butterfly Print'
+[3] suggest_outfit
+      in:  item='Y2K Baby Tee — Butterfly Print', wardrobe=10 items
+      out: **Outfit 1: Off-Duty Y2K** Pair the baby tee with your *Baggy straight-leg jeans, dark wash* using the *Brown …
+[4] create_fit_card
+      in:  item='Y2K Baby Tee — Butterfly Print', outfit='**Outfit 1: Off-Duty Y2K**\nPair the baby tee with your *Bagg'…
+      out: Found this cute butterfly baby tee on Depop for just $18 and I'm obsessed. I've been living in it layered unde…
+  try 1: completed — fit card 255 chars
 
+impossible query stops early  (example wardrobe)
+  query: designer ballgown size XXS under $5
+[1] parse_query
+      in:  designer ballgown size XXS under $5
+      out: {'description': 'designer ballgown', 'size': 'XXS', 'max_price': 5.0}
+[2] search_listings
+      in:  {'description': 'designer ballgown', 'size': 'XXS', 'max_price': 5.0}
+      out: [] (empty)
+      →    branch: no results, stopping before suggest_outfit
+  try 1: stopped early — Nothing in the listings matched description 'designer ballgo
+
+empty wardrobe  (empty wardrobe)
+  query: denim jacket under $50
+[1] parse_query
+      in:  denim jacket under $50
+      out: {'description': 'denim jacket', 'size': None, 'max_price': 50.0}
+[2] search_listings
+      in:  {'description': 'denim jacket', 'size': None, 'max_price': 50.0}
+      out: 7 items: Denim Jacket — Light Wash, Cropped, Vintage Levi's 501 Jeans — Medium Wash, 90s Track Jacket — Navy/White Stripe … +4 more
+      →    branch: 7 found, selected 'Denim Jacket — Light Wash, Cropped'
+[3] suggest_outfit
+      in:  item='Denim Jacket — Light Wash, Cropped', wardrobe=0 items
+      out: **Off-Duty Streetwear:** Layer it over an oversized black graphic hoodie, high-waisted olive green cargo pants…
+[4] create_fit_card
+      in:  item='Denim Jacket — Light Wash, Cropped', outfit='**Off-Duty Streetwear:** Layer it over an oversized black g…
+      out: Scored this light wash cropped denim jacket on Poshmark for $42 and I’m obsessed. It’s giving major off-duty s…
+  try 1: completed — fit card 218 chars
+
+selected item carries through  (example wardrobe)
+  query: band tee size L
+[1] parse_query
+      in:  band tee size L
+      out: {'description': 'band tee', 'size': 'L', 'max_price': None}
+[2] search_listings
+      in:  {'description': 'band tee', 'size': 'L', 'max_price': None}
+      out: 2 items: Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey
+      →    branch: 2 found, selected 'Graphic Tee — 2003 Tour Bootleg Style'
+[3] suggest_outfit
+      in:  item='Graphic Tee — 2003 Tour Bootleg Style', wardrobe=10 items
+      out: **Outfit 1: 2000s Streetwear Grunge** Tuck the graphic tee into the baggy straight-leg jeans, cinched with the…
+[4] create_fit_card
+      in:  item='Graphic Tee — 2003 Tour Bootleg Style', outfit='**Outfit 1: 2000s Streetwear Grunge**\nTuck the graphic …
+      out: Scored this 2003 tour bootleg graphic tee on Depop for just $24 and it’s already doing all the heavy lifting i…
+  try 1: completed — fit card 283 chars
+
+fit card has item, price, vibe  (example wardrobe)
+  query: denim jacket under $50
+[1] parse_query
+      in:  denim jacket under $50
+      out: {'description': 'denim jacket', 'size': None, 'max_price': 50.0}
+[2] search_listings
+      in:  {'description': 'denim jacket', 'size': None, 'max_price': 50.0}
+      out: 7 items: Denim Jacket — Light Wash, Cropped, Vintage Levi's 501 Jeans — Medium Wash, 90s Track Jacket — Navy/White Stripe … +4 more
+      →    branch: 7 found, selected 'Denim Jacket — Light Wash, Cropped'
+  [rate limit] 15 requests used this minute. Waiting 43s. This is normal.
+[3] suggest_outfit
+      in:  item='Denim Jacket — Light Wash, Cropped', wardrobe=10 items
+      out: **Outfit 1: The Double Denim Contrast** Layer the new light wash cropped jacket over the white ribbed tank top…
+[4] create_fit_card
+      in:  item='Denim Jacket — Light Wash, Cropped', outfit='**Outfit 1: The Double Denim Contrast**\nLayer the new ligh…
+      out: Scored this cropped light wash denim jacket on Poshmark for $42 and I’m obsessed. Just threw it on over a whit…
+  try 1: completed — fit card 246 chars
+
+empty wardrobe  (empty wardrobe)
+  query: denim jacket under $50
+[1] parse_query
+      in:  denim jacket under $50
+      out: {'description': 'denim jacket', 'size': None, 'max_price': 50.0}
+[2] search_listings
+      in:  {'description': 'denim jacket', 'size': None, 'max_price': 50.0}
+      out: 7 items: Denim Jacket — Light Wash, Cropped, Vintage Levi's 501 Jeans — Medium Wash, 90s Track Jacket — Navy/White Stripe … +4 more
+      →    branch: 7 found, selected 'Denim Jacket — Light Wash, Cropped'
+[3] suggest_outfit
+      in:  item='Denim Jacket — Light Wash, Cropped', wardrobe=0 items
+      out: **Outfit 1: Elevated Streetwear** Layer the cropped light-wash jacket over an oversized graphic black band tee…
+[4] create_fit_card
+      in:  item='Denim Jacket — Light Wash, Cropped', outfit='**Outfit 1: Elevated Streetwear**\nLayer the cropped light-…
+      out: Scored this cropped light-wash denim jacket on Poshmark for $42 and I'm obsessed. Currently living for throwin…
+  try 1: completed — fit card 240 chars
 ```
 
 ---

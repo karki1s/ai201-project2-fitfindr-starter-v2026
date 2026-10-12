@@ -47,6 +47,30 @@ SCENARIOS = [
     # For a fit-card criterion, you probably want the SAME query listed more
     # than once, or several different items, depending on what your criterion
     # actually says.
+    {
+        # State check: selected_item should be search_results[0], and its title
+        # should show up in the outfit and the fit card. Size filter included so
+        # the parsed size has to make it through too.
+        "name": "selected item carries through",
+        "query": "band tee size L",
+        "wardrobe": "example",
+        "criterion": 3,
+    },
+    {
+        # Fit card details: item name, price, outfit vibe. A different item from
+        # criterion 1 so the card isn't only ever judged on one listing.
+        "name": "fit card has item, price, vibe",
+        "query": "denim jacket under $50",
+        "wardrobe": "example",
+        "criterion": 4,
+    },
+    {
+        # A user with nothing saved — general advice, still a fit card.
+        "name": "empty wardrobe",
+        "query": "denim jacket under $50",
+        "wardrobe": "empty",
+        "criterion": 5,
+    },
 ]
 
 WARDROBES = ("example", "empty")
