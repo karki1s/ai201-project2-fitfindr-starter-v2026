@@ -40,9 +40,13 @@
 ## What This Does
 
 <!-- Three or four sentences: what a user asks for, and what they get back. -->
-User asked for 'vintage graphic tee under $30' using `python app.py ask 'vintage graphic tee under $30'`
-It return following:
-The planning loop isn't built yet — see the TODO in agent.py.
+A user describes a secondhand item in plain language, such as
+`python app.py ask 'vintage graphic tee under $30'`. FitFindr pulls a description,
+size and price ceiling out of the query and searches a catalogue of 40 thrift
+listings. It picks the best match and suggests one or two outfits built around it,
+using pieces from the user's wardrobe when one is saved. It finishes with a short
+social-media-style fit card naming the item, its price and platform. If nothing
+matches, it stops after the search and tells the user what to change in the query.
 
 
 ---
@@ -124,9 +128,19 @@ to create_fit_card.
 
 **Where it lives:** `agent.py::run_agent`
 
-**How the query is parsed:** <!-- regex, string splitting, or asking the model — say which -->
+**How the query is parsed:** Regex, in `agent.py::parse_query`. It first pulls
+out a price ("under $30", "below 40", "$25"), then a size ("size M", "size US 9",
+"size W30"). Each match is cut from the query, filler words ("looking for", "a",
+"in") are stripped, and whatever is left becomes the description. Size and
+max_price are `None` when the query doesn't mention them.
 
-**What moves through the session:** <!-- which fields, in what order -->
+**What moves through the session:** in this order: `query` (what the user typed)
+→ `parsed` (description / size / max_price) → `search_results` (everything
+`search_listings` returned) → `selected_item` (the first result) →
+`outfit_suggestion` (from `suggest_outfit`, which also reads `wardrobe`) →
+`fit_card` (from `create_fit_card`). If the search comes back empty, `error` is
+set and the run returns with `selected_item`, `outfit_suggestion` and `fit_card`
+still `None`. `error` is also set if the model can't be reached.
 
 ---
 
