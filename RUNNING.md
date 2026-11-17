@@ -153,6 +153,29 @@ gunicorn serve:app
 that yourself in the follow-along, before you deploy — instrumenting first is
 the point of the session.
 
+### With Docker
+
+Needs Docker Desktop (or any Docker engine) running, and a `.env` with your
+`GEMINI_API_KEY` in the repo root. The key is passed in at run time. It is
+never copied into the image (`.dockerignore` excludes `.env`).
+
+```bash
+docker build -t fitfindr .
+
+# CLI: one query
+docker run --rm --env-file .env fitfindr python app.py ask 'vintage graphic tee under $30' --trace
+
+# Eval: mount results/ so the run log lands on your machine, not inside the container
+docker run --rm --env-file .env -v "$PWD/results:/app/results" fitfindr python run_eval.py --label before
+
+# HTTP server (the default command): gunicorn, 1 sync worker, port 5000
+docker run --rm --env-file .env -p 5000:5000 fitfindr
+curl http://localhost:5000/health
+```
+
+The image is `python:3.13-slim` and installs `requirements.txt`. The default command is the server, so the same image runs unchanged on a host that sets
+`PORT`.
+
 ---
 
 ## Where everything lives

@@ -135,9 +135,9 @@ out a price ("under $30", "below 40", "$25"), then a size ("size M", "size US 9"
 max_price are `None` when the query doesn't mention them.
 
 **What moves through the session:** in this order: `query` (what the user typed)
-→ `parsed` (description / size / max_price) → `search_results` (everything
-`search_listings` returned) → `selected_item` (the first result) →
-`outfit_suggestion` (from `suggest_outfit`, which also reads `wardrobe`) →
+then `parsed` (description / size / max_price) then `search_results` (everything
+`search_listings` returned) then `selected_item` (the first result) then
+`outfit_suggestion` (from `suggest_outfit`, which also reads `wardrobe`) then
 `fit_card` (from `create_fit_card`). If the search comes back empty, `error` is
 set and the run returns with `selected_item`, `outfit_suggestion` and `fit_card`
 still `None`. `error` is also set if the model can't be reached.
@@ -643,3 +643,30 @@ No criterion is missed, but three things are still wrong:
 ---
 
 📖 **How to run this project: [RUNNING.md](RUNNING.md)**
+
+
+## Capstone
+
+**What This Extends**
+
+I am extending the FitFindr, the thrift-shopping agent from units 3 & 4. What's new is a
+second ranking strategy in `tools.py::search_listings`: field-weighted scoring,
+where a query word found in a listing's title or category counts for more than
+the same word found in its description, colors or tags. Ties are broken by a
+fixed rule instead of by file order. The old keyword-count ranker stays in the
+code behind a switch, so both can be run on the same queries and compared.
+
+**The Shape**
+
+In unit 4 my diagnosis found that `search_listings` counts every matching word equally, wherever it appears. So for "vintage graphic tee", three tees tied at a score of 3 and the first one in the file won. And for "black combat boots", an "Oversized Flannel Shirt — Plaid Red/Black" ranked first, because "black" appears in many listings and outweighed the noun that says what the user wants. None of my unit 4 criteria caught either one, because they only checked that the tools ran. This unit adds the weighted ranker and tests whether it puts the right *kind* of item first, without breaking the price/size filters or the empty-search branch.
+
+Out of scope:
+- **No fallback search.** When nothing matches, the agent still stops and tells the user what to change. It doesn't loosen the query and search again.
+- **No prompt changes.** The `suggest_outfit` and `create_fit_card` prompts stay as they are, including the known issue where fit cards invent clothes for an empty wardrobe.
+- **No hosting.** It runs locally in Docker (Path B). The image is built so it could be hosted later, but I'm not signing up for a platform this unit.
+- **No new search fields or synonyms.** "trainers" still won't find "sneakers"; the ranker only reweights the words that already match.
+
+**Running It**
+
+Path B, local with logs, run in Docker. The build and run commands are in
+[RUNNING.md](RUNNING.md) under "With Docker".
