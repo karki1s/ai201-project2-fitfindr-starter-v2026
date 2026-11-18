@@ -670,3 +670,87 @@ Out of scope:
 
 Path B, local with logs, run in Docker. The build and run commands are in
 [RUNNING.md](RUNNING.md) under "With Docker".
+
+**Instrumentation**
+
+Every agent run writes one JSON record (one line) to `logs/runs.jsonl`. That
+covers the CLI, the HTTP server and the eval, and runs that complete, stop
+early, raise, or get rejected with a 400. The logging lives in
+`agent.py::run_agent`, which wraps the loop in `try/finally` so a record is
+written however the run ends, plus `serve.py::_reject` for 400s. The writer is `runlog.py::write`, which never raises, so logging can't take a run down.
+
+Each record holds:
+
+| Field | What it is |
+|---|---|
+| `ts`, `run_id`, `source` | when (UTC), a short id, and where it came from: `cli` / `http` / `eval` |
+| `query`, `ranker`, `parsed` | what came in, which ranker ran, and what `parse_query` pulled out |
+| `outcome` | `completed` / `no_results` / `model_unavailable` / `rejected` / `exception` |
+| `n_results`, `top_item_id`, `top_item_title`, `top_item_price` | what the search returned and which listing was selected |
+| `outfit_chars`, `fit_card`, `error` | what came out: outfit length, the fit card text, or the error |
+| `duration_ms` | wall-clock time for the whole run |
+| `model_calls`, `cache_hits`, `prompt_tokens`, `output_tokens`, `cache_enabled` | what this run cost, as reported by the API, counted for this run only |
+
+Extract from a real session: the Docker container (`docker run ... -e AI201_CACHE=0`),
+called over HTTP with curl, on 2026-11-18. The first 10 lines are completed runs.
+The rest are one of each failure type. Two failures were found this way:
+
+- **Both `exception` runs** were gunicorn killing the worker. The rate limiter
+  in `generate.py` paused 41 s (15 calls per minute), longer than gunicorn's
+  default 30 s worker timeout, so the request died with a 500. The record shows
+  `"error": null` because gunicorn exits with `SystemExit`, which my first
+  version (`except Exception`) didn't catch. I fixed both: the logger catches
+  `BaseException`, and the Dockerfile sets `--timeout 120`. After the fix, the
+  same 10-query burst returned 10/10 with 200. Two of those waited 17 s and
+  31 s on the rate limit; you can see them below.
+- **`model_unavailable`** was triggered on purpose with
+  `-e GEMINI_API_KEY=not-a-real-key`. The search still ran and the record
+  keeps the item it found.
+
+```
+{"ts": "2026-11-18T04:54:13.365+00:00", "run_id": "95083dec", "source": "http", "query": "red flannel", "ranker": "weighted", "parsed": {"description": "red flannel", "size": null, "max_price": null}, "outcome": "completed", "n_results": 2, "top_item_id": "lst_003", "top_item_title": "Oversized Flannel Shirt — Plaid Red/Black", "top_item_price": 22.0, "outfit_chars": 566, "fit_card": "Score this oversized red and black flannel on thredUp for just $22. I'm obsessed with throwing it unbuttoned over a white tank and baggy jeans for the ultimate 90s grunge look. Such an easy piece to live in all fall.", "error": null, "duration_ms": 2448, "model_calls": 2, "cache_hits": 0, "prompt_tokens": 487, "output_tokens": 177, "cache_enabled": false}
+{"ts": "2026-11-18T04:54:15.833+00:00", "run_id": "9d3cb05f", "source": "http", "query": "vintage jeans under $40", "ranker": "weighted", "parsed": {"description": "vintage jeans", "size": null, "max_price": 40.0}, "outcome": "completed", "n_results": 10, "top_item_id": "lst_001", "top_item_title": "Vintage Levi's 501 Jeans — Medium Wash", "top_item_price": 38.0, "outfit_chars": 569, "fit_card": "Score these vintage Levi's 501s on Depop for just $38 and I am never taking them off. Obsessed with throwing on an oversized grey crewneck and chunky sneakers for that effortless streetwear vibe. Such a good denim win.", "error": null, "duration_ms": 2585, "model_calls": 2, "cache_hits": 0, "prompt_tokens": 491, "output_tokens": 181, "cache_enabled": false}
+{"ts": "2026-11-18T04:54:18.431+00:00", "run_id": "e6dc583a", "source": "http", "query": "platform shoes", "ranker": "weighted", "parsed": {"description": "platform shoes", "size": null, "max_price": null}, "outcome": "completed", "n_results": 4, "top_item_id": "lst_019", "top_item_title": "Platform Sneakers — White Chunky Sole", "top_item_price": 48.0, "outfit_chars": 560, "fit_card": "Score these chunky platform sneakers on Poshmark for just $48 and I am officially in my Y2K era. They look so good peeking out from under baggy dark denim and a vintage jacket, but I'm obsessed with wearing them under wide-leg khaki trousers and a cropped zip hoodie next. Absolute steal.", "error": null, "duration_ms": 2659, "model_calls": 2, "cache_hits": 0, "prompt_tokens": 477, "output_tokens": 188, "cache_enabled": false}
+{"ts": "2026-11-18T04:54:21.105+00:00", "run_id": "2494342d", "source": "http", "query": "leather jacket under $80", "ranker": "weighted", "parsed": {"description": "leather jacket", "size": null, "max_price": 80.0}, "outcome": "completed", "n_results": 7, "top_item_id": "lst_022", "top_item_title": "90s Leather Bomber — Black", "top_item_price": 75.0, "outfit_chars": 542, "fit_card": "Scored this vintage leather bomber on depop for $75 and it’s officially my entire personality now. I’m living in it this fall, whether throwing it over a grey crewneck and khakis for that high-contrast casual look or keeping it downtown grunge with a ribbed tank and combat boots. Honestly the best $75 I've spent in a minute.", "error": null, "duration_ms": 2109, "model_calls": 2, "cache_hits": 0, "prompt_tokens": 484, "output_tokens": 204, "cache_enabled": false}
+{"ts": "2026-11-18T04:54:23.232+00:00", "run_id": "ec78626e", "source": "http", "query": "y2k top size S", "ranker": "weighted", "parsed": {"description": "y2k top", "size": "S", "max_price": null}, "outcome": "completed", "n_results": 4, "top_item_id": "lst_017", "top_item_title": "Mesh Long-Sleeve Top — Black", "top_item_price": 15.0, "outfit_chars": 455, "fit_card": "Snagged this black mesh top on Depop for just $15 and I am so obsessed. I've been throwing it over a white ribbed tank with baggy straight-leg jeans and combat boots for the ultimate 90s grunge look. Such an easy piece to layer!", "error": null, "duration_ms": 1803, "model_calls": 2, "cache_hits": 0, "prompt_tokens": 463, "output_tokens": 167, "cache_enabled": false}
+{"ts": "2026-11-18T04:54:25.054+00:00", "run_id": "ad39d885", "source": "http", "query": "olive shacket", "ranker": "weighted", "parsed": {"description": "olive shacket", "size": null, "max_price": null}, "outcome": "completed", "n_results": 2, "top_item_id": "lst_032", "top_item_title": "Shacket — Olive Canvas", "top_item_price": 33.0, "outfit_chars": 591, "fit_card": "Scored this olive canvas shacket on Poshmark for $33 and it’s about to be my entire personality. Obsessed with throwing it over baggy denim and sneakers for running errands, or layering it with a grey crewneck and combat boots when I want that heavy-duty utility vibe. So good.", "error": null, "duration_ms": 17372, "model_calls": 2, "cache_hits": 0, "prompt_tokens": 481, "output_tokens": 196, "cache_enabled": false}
+{"ts": "2026-11-18T04:54:42.446+00:00", "run_id": "99226cb3", "source": "http", "query": "velvet blazer", "ranker": "weighted", "parsed": {"description": "velvet blazer", "size": null, "max_price": null}, "outcome": "completed", "n_results": 2, "top_item_id": "lst_036", "top_item_title": "Velvet Blazer — Emerald Green", "top_item_price": 52.0, "outfit_chars": 576, "fit_card": "Found this emerald velvet blazer on depop for $52 and I’m so obsessed. Honestly living for the high-low glam vibe of throwing it over a white ribbed tank with baggy jeans and chunky white sneakers. Such an easy way to dress up denim without trying too hard.", "error": null, "duration_ms": 2158, "model_calls": 2, "cache_hits": 0, "prompt_tokens": 474, "output_tokens": 183, "cache_enabled": false}
+{"ts": "2026-11-18T04:54:44.627+00:00", "run_id": "0d94aa31", "source": "http", "query": "studded denim vest", "ranker": "weighted", "parsed": {"description": "studded denim vest", "size": null, "max_price": null}, "outcome": "completed", "n_results": 6, "top_item_id": "lst_038", "top_item_title": "Denim Vest — Medium Wash, Studded", "top_item_price": 27.0, "outfit_chars": 678, "fit_card": "scored this studded denim vest on depop for $27 and I'm obsessed. I'm living for throwing it over an oversized grey crewneck with baggy jeans and combat boots for that ultimate grunge look. such an easy way to edge up a basic fit.", "error": null, "duration_ms": 30738, "model_calls": 2, "cache_hits": 0, "prompt_tokens": 496, "output_tokens": 195, "cache_enabled": false}
+{"ts": "2026-11-18T04:55:15.378+00:00", "run_id": "0b6e79e1", "source": "http", "query": "track jacket", "ranker": "weighted", "parsed": {"description": "track jacket", "size": null, "max_price": null}, "outcome": "completed", "n_results": 4, "top_item_id": "lst_004", "top_item_title": "90s Track Jacket — Navy/White Stripe", "top_item_price": 45.0, "outfit_chars": 609, "fit_card": "Scored this navy and white 90s track jacket on Poshmark for $45 and I'm obsessed. It looks so good zipped all the way up with wide-leg khaki trousers and chunky combat boots for that high-low sporty tailoring vibe.", "error": null, "duration_ms": 2343, "model_calls": 2, "cache_hits": 0, "prompt_tokens": 506, "output_tokens": 197, "cache_enabled": false}
+{"ts": "2026-11-18T04:55:17.742+00:00", "run_id": "4fae475a", "source": "http", "query": "linen trousers", "ranker": "weighted", "parsed": {"description": "linen trousers", "size": null, "max_price": null}, "outcome": "completed", "n_results": 3, "top_item_id": "lst_025", "top_item_title": "Wide-Leg Linen Trousers — Natural", "top_item_price": 34.0, "outfit_chars": 632, "fit_card": "Scored these linen trousers on Poshmark for just $34 and I’m officially in my coastal grandma era. Love throwing them on with a simple white tank and my chunky sneakers for the easiest hot-weather outfit. Already planning to grunge them up a bit with my combat boots and an oversized sweatshirt for cooler nights, too!", "error": null, "duration_ms": 3689, "model_calls": 2, "cache_hits": 0, "prompt_tokens": 493, "output_tokens": 198, "cache_enabled": false}
+{"ts": "2026-11-18T04:52:32.136+00:00", "run_id": "a86cc2b3", "source": "http", "query": "red flannel", "ranker": "weighted", "parsed": null, "outcome": "exception", "n_results": 0, "top_item_id": null, "top_item_title": null, "top_item_price": null, "outfit_chars": 0, "fit_card": null, "error": null, "duration_ms": 30781, "model_calls": 1, "cache_hits": 0, "prompt_tokens": 254, "output_tokens": 85, "cache_enabled": false}
+{"ts": "2026-11-18T04:53:36.158+00:00", "run_id": "e9a6a7e4", "source": "http", "query": "designer ballgown size XXS under $5", "ranker": "weighted", "parsed": {"description": "designer ballgown", "size": "XXS", "max_price": 5.0}, "outcome": "no_results", "n_results": 0, "top_item_id": null, "top_item_title": null, "top_item_price": null, "outfit_chars": 0, "fit_card": null, "error": "Nothing in the listings matched description 'designer ballgown', size XXS, max price $5.\nThings you can change and try: try broader words: 'jacket' finds more than 'leather jacket'; drop the size you used 'XXS' and try a neighboring one; raise the price ceiling above the $5.", "duration_ms": 436, "model_calls": 0, "cache_hits": 0, "prompt_tokens": 0, "output_tokens": 0, "cache_enabled": false}
+{"ts": "2026-11-18T04:53:37.077+00:00", "run_id": "2611ec8b", "source": "http", "query": "tee", "ranker": "bogus", "outcome": "rejected", "error": "'ranker' must be one of ['keyword', 'weighted'], got 'bogus'", "duration_ms": 0, "model_calls": 0, "prompt_tokens": 0, "output_tokens": 0}
+{"ts": "2026-11-18T04:55:29.350+00:00", "run_id": "897395d5", "source": "cli", "query": "denim jacket under $50", "ranker": "weighted", "parsed": {"description": "denim jacket", "size": null, "max_price": 50.0}, "outcome": "model_unavailable", "n_results": 7, "top_item_id": "lst_007", "top_item_title": "Denim Jacket — Light Wash, Cropped", "top_item_price": 42.0, "outfit_chars": 0, "fit_card": null, "error": "Couldn't reach the model, so no outfit or fit card was written. The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com. (The search itself worked — it found 'Denim Jacket — Light Wash, Cropped'.)", "duration_ms": 1021, "model_calls": 1, "cache_hits": 0, "prompt_tokens": 0, "output_tokens": 0, "cache_enabled": false}
+{"ts": "2026-11-18T04:53:37.084+00:00", "run_id": "cd49f7b4", "source": "http", "query": null, "ranker": null, "outcome": "rejected", "error": "Send JSON with a 'query' field, e.g. {\"query\": \"vintage graphic tee under $30\"}", "duration_ms": 0, "model_calls": 0, "prompt_tokens": 0, "output_tokens": 0}
+```
+
+The whole log is committed at `logs/runs.jsonl`. `python runlog.py` summarises it.
+
+**What It Costs**
+
+Measured from `logs/runs.jsonl`, not from a pricing page. The token counts are
+what the Gemini API reported on each response (`usage_metadata`, recorded by
+`generate.py::_record_tokens`). Each record holds only the change during that
+run. The cache was off (`AI201_CACHE=0`), so every model call was real. I
+averaged the 18 completed runs from the session above
+(`python runlog.py`, plus the median/min/max from the same records):
+
+| Per completed run | Measured |
+|---|---|
+| Model calls | 2.00 (always 2: `suggest_outfit` + `create_fit_card`) |
+| Tokens | 486 prompt + 188 output = **674 total** (range 463–506 prompt, 167–204 output) |
+| Time, no rate-limit wait (16 runs) | 2.57 s average |
+| Time, all 18 runs | 4.96 s average, 2.60 s median, max 30.7 s (a run waiting on the 15-per-minute limiter) |
+
+An empty search (`no_results`) costs 0 model calls, 0 tokens and about 0.45 s.
+The branch stops before either model call. A rejected request costs nothing.
+
+**For 100 people a day**, one query each:
+- tokens: 100 × 674 = **67,400 tokens/day** (48,600 prompt + 18,800 output)
+- model calls: 100 × 2 = **200 calls/day**
+- time: 100 × 2.57 s = **257 s ≈ 4.3 minutes of agent time/day**
+
+The limit that bites first isn't money. It's the 15-calls-per-minute pacing:
+that's 7 completed runs a minute, so more than about 7 people asking in the
+same minute start queueing (one request at a time, see `serve.py`).

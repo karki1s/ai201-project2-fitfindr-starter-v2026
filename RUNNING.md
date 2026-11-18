@@ -163,13 +163,13 @@ never copied into the image (`.dockerignore` excludes `.env`).
 docker build -t fitfindr .
 
 # CLI: one query
-docker run --rm --env-file .env fitfindr python app.py ask 'vintage graphic tee under $30' --trace
+docker run --rm --env-file .env -v "$PWD/logs:/app/logs" fitfindr python app.py ask 'vintage graphic tee under $30' --trace
 
 # Eval: mount results/ so the run log lands on your machine, not inside the container
-docker run --rm --env-file .env -v "$PWD/results:/app/results" fitfindr python run_eval.py --label before
+docker run --rm --env-file .env -v "$PWD/results:/app/results" -v "$PWD/logs:/app/logs" fitfindr python run_eval.py --label before
 
 # HTTP server (the default command): gunicorn, 1 sync worker, port 5000
-docker run --rm --env-file .env -p 5000:5000 fitfindr
+docker run --rm --env-file .env -v "$PWD/logs:/app/logs" -p 5000:5000 fitfindr
 
 # in a second terminal
 curl http://localhost:5000/health
@@ -181,6 +181,24 @@ curl -X POST http://localhost:5000/ask \
 `ranker` is optional: `"weighted"` (the default, capstone ranker) or
 `"keyword"` (the original unit 3 ranker). Anything else gets a 400. The CLI
 takes the same choice as `--ranker keyword`.
+
+**The run log.** Every run (CLI, HTTP or eval) appends one JSON line to
+`logs/runs.jsonl`, including runs that stopped early, failed or were rejected
+with a 400. Field list: top of `runlog.py`. The `-v "$PWD/logs:/app/logs"`
+mount is what keeps that file on your machine. Without it, the log is lost
+when the container exits. Read it with:
+
+```bash
+python runlog.py              # outcome counts + average duration / calls / tokens
+python runlog.py --last 10    # the last 10 records, one JSON object per line
+```
+
+For a real cost number, run with the response cache off: add
+`-e AI201_CACHE=0` to `docker run`. Cached answers cost 0 tokens.
+
+**Environment:** Python 3.13 (the `python:3.13-slim` image), packages pinned
+exactly in `requirements.lock`, no local model files: the model is called over
+the Gemini API, so the only secret is `GEMINI_API_KEY`.
 
 The image is `python:3.13-slim` and installs `requirements.txt`. The default command is the server, so the same image runs unchanged on a host that sets
 `PORT`.

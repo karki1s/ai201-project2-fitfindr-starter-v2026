@@ -43,6 +43,7 @@ import config  # noqa: F401
 
 from flask import Flask, jsonify, request
 
+import runlog
 from agent import run_agent
 from tools import DEFAULT_RANKER, RANKERS
 from utils.data_loader import get_example_wardrobe
@@ -98,6 +99,24 @@ def health():
     return jsonify({"status": "ok"})
 
 
+def _reject(payload: dict, message: str):
+    """400 for a bad request — and a log line, so rejections aren't invisible."""
+    runlog.write({
+        "ts": runlog.now_iso(),
+        "run_id": runlog.new_run_id(),
+        "source": "http",
+        "query": payload.get("query"),
+        "ranker": payload.get("ranker"),
+        "outcome": "rejected",
+        "error": message,
+        "duration_ms": 0,
+        "model_calls": 0,
+        "prompt_tokens": 0,
+        "output_tokens": 0,
+    })
+    return jsonify({"error": message}), 400
+
+
 @app.post("/ask")
 def ask():
     """
@@ -108,21 +127,24 @@ def ask():
                                                 example wardrobe the CLI uses.
     Out:  the session dict from run_agent(), as JSON.
     """
-    payload = request.get_json(silent=True) or {}
-    query = (payload.get("query") or "").strip()
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    raw_query = payload.get("query")
+    query = raw_query.strip() if isinstance(raw_query, str) else ""
     if not query:
         # 400 rather than a stack trace: the caller can act on this one.
-        return jsonify({"error": "Send JSON with a 'query' field, e.g. "
-                                 '{"query": "vintage graphic tee under $30"}'}), 400
+        return _reject(payload, "Send JSON with a 'query' field, e.g. "
+                                '{"query": "vintage graphic tee under $30"}')
 
     wardrobe = payload.get("wardrobe")
     if not isinstance(wardrobe, dict):
         wardrobe = get_example_wardrobe()
 
     ranker = payload.get("ranker", DEFAULT_RANKER)
-    if ranker not in RANKERS:
-        return jsonify({"error": f"'ranker' must be one of {sorted(RANKERS)}, "
-                                 f"got {ranker!r}"}), 400
+    if not isinstance(ranker, str) or ranker not in RANKERS:
+        return _reject(payload, f"'ranker' must be one of {sorted(RANKERS)}, "
+                                f"got {ranker!r}")
 
     # A queued request should look like a queued request. Without this the
     # second caller just sits there, and "slow" and "waiting its turn" are
@@ -146,7 +168,7 @@ def ask():
     session = None
     with _one_at_a_time:
         try:
-            session = run_agent(query, wardrobe, ranker)
+            session = run_agent(query, wardrobe, ranker, source="http")
         except Exception as exc:  # noqa: BLE001 — a 500 with a sentence beats a hang
             failure = f"{type(exc).__name__}: {exc}"
 

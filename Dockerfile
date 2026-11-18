@@ -15,8 +15,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # Install deps first so code changes don't invalidate this layer.
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+# requirements.lock = exact versions frozen from a working venv, so every
+# build installs the same thing. requirements.txt keeps the course's ranges.
+COPY requirements.lock .
+RUN pip install -r requirements.lock
 
 COPY . .
 
@@ -29,4 +31,7 @@ EXPOSE 5000
 # Default: the HTTP server, the way a host would run it. Sync worker and one
 # worker on purpose — see the note above _one_at_a_time in serve.py.
 # Override the command to use the CLI instead (see top of file).
-CMD ["sh", "-c", "gunicorn --workers 1 --bind 0.0.0.0:${PORT:-5000} serve:app"]
+# --timeout 120: generate.py's rate limiter can pause up to ~60s when the
+# 15-calls-per-minute window is full. gunicorn's default 30s timeout killed
+# those requests mid-run (500 after 30s) — seen in logs/runs.jsonl.
+CMD ["sh", "-c", "gunicorn --workers 1 --timeout 120 --bind 0.0.0.0:${PORT:-5000} serve:app"]

@@ -14,8 +14,11 @@ Build and test your three tools in `tools.py` first. Then come here.
 """
 
 import re
+import time
 
 import config
+import generate
+import runlog
 import trace
 from tools import search_listings, suggest_outfit, create_fit_card
 from generate import ModelUnavailable
@@ -110,7 +113,54 @@ def _no_results_message(parsed: dict) -> str:
 
 # ── planning loop ─────────────────────────────────────────────────────────────
 
-def run_agent(query: str, wardrobe: dict, ranker: str = "weighted") -> dict:
+def run_agent(query: str, wardrobe: dict, ranker: str = "weighted",
+              source: str = "cli") -> dict:
+    """
+    Run the loop once, and write one structured record to logs/runs.jsonl
+    (see runlog.py) whatever happens — completed, stopped early, or raised.
+    """
+    run_id, started_at = runlog.new_run_id(), runlog.now_iso()
+    calls_before = generate.call_count()
+    hits_before = generate._cache_hits
+    tokens_before = generate.token_counts()
+    start = time.perf_counter()
+    session, exc_text = None, None
+    try:
+        session = _run_loop(query, wardrobe, ranker)
+        return session
+    except BaseException as exc:
+        # BaseException, not Exception: gunicorn kills a timed-out worker with
+        # SystemExit, and that run still needs a record saying why it ended.
+        exc_text = f"{type(exc).__name__}: {exc}"
+        raise
+    finally:
+        tokens_after = generate.token_counts()
+        item = (session or {}).get("selected_item") or {}
+        runlog.write({
+            "ts": started_at,
+            "run_id": run_id,
+            "source": source,
+            "query": query,
+            "ranker": ranker,
+            "parsed": (session or {}).get("parsed") or None,
+            "outcome": runlog.outcome_of(session, exc_text),
+            "n_results": len((session or {}).get("search_results") or []),
+            "top_item_id": item.get("id"),
+            "top_item_title": item.get("title"),
+            "top_item_price": item.get("price"),
+            "outfit_chars": len((session or {}).get("outfit_suggestion") or ""),
+            "fit_card": (session or {}).get("fit_card"),
+            "error": exc_text or (session or {}).get("error"),
+            "duration_ms": round((time.perf_counter() - start) * 1000),
+            "model_calls": generate.call_count() - calls_before,
+            "cache_hits": generate._cache_hits - hits_before,
+            "prompt_tokens": tokens_after["prompt"] - tokens_before["prompt"],
+            "output_tokens": tokens_after["output"] - tokens_before["output"],
+            "cache_enabled": config.CACHE_ENABLED,
+        })
+
+
+def _run_loop(query: str, wardrobe: dict, ranker: str = "weighted") -> dict:
     """
     Run the loop once and return the finished session.
 
