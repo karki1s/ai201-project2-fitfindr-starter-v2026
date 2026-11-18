@@ -170,8 +170,17 @@ docker run --rm --env-file .env -v "$PWD/results:/app/results" fitfindr python r
 
 # HTTP server (the default command): gunicorn, 1 sync worker, port 5000
 docker run --rm --env-file .env -p 5000:5000 fitfindr
+
+# in a second terminal
 curl http://localhost:5000/health
+curl -X POST http://localhost:5000/ask \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "vintage graphic tee under $30", "ranker": "weighted"}'
 ```
+
+`ranker` is optional: `"weighted"` (the default, capstone ranker) or
+`"keyword"` (the original unit 3 ranker). Anything else gets a 400. The CLI
+takes the same choice as `--ranker keyword`.
 
 The image is `python:3.13-slim` and installs `requirements.txt`. The default command is the server, so the same image runs unchanged on a host that sets
 `PORT`.

@@ -24,7 +24,7 @@ from mcp_client import call_tool
 
 # ── session state ─────────────────────────────────────────────────────────────
 
-def new_session(query: str, wardrobe: dict) -> dict:
+def new_session(query: str, wardrobe: dict, ranker: str = "weighted") -> dict:
     """
     A fresh session for one user interaction.
 
@@ -41,6 +41,7 @@ def new_session(query: str, wardrobe: dict) -> dict:
     return {
         "query": query,              # what the user typed
         "parsed": {},                # description / size / max_price you pulled out of it
+        "ranker": ranker,            # which search ranking strategy ran (capstone)
         "search_results": [],        # everything search_listings returned
         "selected_item": None,       # the one you chose — goes into suggest_outfit
         "wardrobe": wardrobe,        # the user's wardrobe
@@ -109,7 +110,7 @@ def _no_results_message(parsed: dict) -> str:
 
 # ── planning loop ─────────────────────────────────────────────────────────────
 
-def run_agent(query: str, wardrobe: dict) -> dict:
+def run_agent(query: str, wardrobe: dict, ranker: str = "weighted") -> dict:
     """
     Run the loop once and return the finished session.
 
@@ -165,7 +166,7 @@ def run_agent(query: str, wardrobe: dict) -> dict:
       • A handler for ModelUnavailable, so a bad key produces a message rather
         than a stack trace. The import is already at the top of this file.
     """
-    session = new_session(query, wardrobe)
+    session = new_session(query, wardrobe, ranker)
     steps = 0
 
     try:
@@ -183,6 +184,7 @@ def run_agent(query: str, wardrobe: dict) -> dict:
                     "description": parsed["description"],
                     "size": parsed["size"],
                     "max_price": parsed["max_price"],
+                    "ranker": session["ranker"],
                 })
                 session["search_results"] = results
 

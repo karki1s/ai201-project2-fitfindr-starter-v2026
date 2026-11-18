@@ -104,14 +104,14 @@ def cmd_examples(args):
     )
 
 
-def _ask_one(query, wardrobe, use_trace):
+def _ask_one(query, wardrobe, use_trace, ranker="weighted"):
     from agent import run_agent
     import trace as trace_module
 
     if use_trace:
         trace_module.start_trace()
 
-    session = run_agent(query, wardrobe)
+    session = run_agent(query, wardrobe, ranker)
 
     print()
     if session["error"]:
@@ -145,7 +145,7 @@ def cmd_ask(args):
 
     try:
         if args.query:
-            _ask_one(args.query, wardrobe, args.trace)
+            _ask_one(args.query, wardrobe, args.trace, args.ranker)
         else:
             print("Ask for something, or press Enter on an empty line to quit.\n")
             while True:
@@ -156,7 +156,7 @@ def cmd_ask(args):
                     break
                 if not query:
                     break
-                _ask_one(query, wardrobe, args.trace)
+                _ask_one(query, wardrobe, args.trace, args.ranker)
     finally:
         print(generate.usage())
 
@@ -188,6 +188,12 @@ def build_parser():
         "--empty-wardrobe",
         action="store_true",
         help="run as a user with nothing saved — one of unit 4's failure modes",
+    )
+    p_ask.add_argument(
+        "--ranker",
+        choices=["weighted", "keyword"],
+        default="weighted",
+        help="search ranking: weighted (capstone, default) or keyword (unit 3 original)",
     )
     p_ask.set_defaults(func=cmd_ask)
 

@@ -36,10 +36,16 @@ def search_listings(
     description: str,
     size: str | None = None,
     max_price: float | None = None,
+    ranker: str = "weighted",
 ) -> list[dict]:
     """
     Search the listings data for items matching a description, and optionally a
     size and a price ceiling.
+
+    ranker: "weighted" (default, capstone) scores title/category matches above
+            description matches and breaks ties by price then id.
+            "keyword" is the original unit 3 ranker: one point per matching
+            word anywhere, ties in file order.
 
     This is the tool that doesn't call the model, which makes it the easiest one
     to test and the one to move onto MCP in unit 4.
@@ -83,29 +89,87 @@ def search_listings(
     Test it from a terminal before you move on:
         python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
     """
+    if ranker not in RANKERS:
+        raise ValueError(f"unknown ranker {ranker!r} — use one of {sorted(RANKERS)}")
+    score_fn = RANKERS[ranker]
+
     query_words = _tokenize_helper(description)
-    wanted_size = _tokenize_helper(size) if size else None 
+    wanted_size = _tokenize_helper(size) if size else None
     scored = []
     listings = load_listings()
     for listing in listings:
         if max_price is not None and listing["price"] > max_price:
-            continue 
+            continue
         if wanted_size and not wanted_size <= _tokenize_helper(listing["size"]):
             continue
-        searchable = " ".join([
-            listing["title"],
-            listing["description"],
-            listing["category"],
-            " ".join(listing["style_tags"]),
-            " ".join(listing["colors"]),
-            listing["brand"] or "",
-        ])
-        score = len(query_words & _tokenize_helper(searchable))
+        score = score_fn(query_words, listing)
         if score > 0:
             scored.append((score, listing))
 
-    scored.sort(key=lambda pair: pair[0], reverse=True)
+    if ranker == "keyword":
+        # Original behaviour, kept as-is for comparison: ties keep file order.
+        scored.sort(key=lambda pair: pair[0], reverse=True)
+    else:
+        # Ties: cheaper first, then listing id, so the order never depends on
+        # where a listing sits in the file.
+        scored.sort(key=lambda pair: (-pair[0], pair[1]["price"], pair[1]["id"]))
     return [listing for _, listing in scored[: config.SEARCH_RESULT_LIMIT]]
+
+
+# ── ranking strategies ────────────────────────────────────────────────────────
+
+def _score_keyword(query_words: set[str], listing: dict) -> float:
+    """Unit 3 ranker: one point per query word found anywhere in the listing."""
+    searchable = " ".join([
+        listing["title"],
+        listing["description"],
+        listing["category"],
+        " ".join(listing["style_tags"]),
+        " ".join(listing["colors"]),
+        listing["brand"] or "",
+    ])
+    return len(query_words & _tokenize_helper(searchable))
+
+
+# Where a word is found says how much it means. A word in the title or category
+# names the item; a tag is a deliberate label; a word in the description,
+# colors or brand may only be incidental ("pairs well with black boots").
+FIELD_WEIGHTS = {
+    "title": 3,
+    "category": 3,
+    "style_tags": 2,
+    "description": 1,
+    "colors": 1,
+    "brand": 1,
+}
+
+
+def _score_weighted(query_words: set[str], listing: dict) -> float:
+    """
+    Capstone ranker: each query word scores the weight of the best field it
+    appears in (not the sum), so one word repeated across fields can't
+    outweigh a second, different word.
+    """
+    fields = {
+        "title": listing["title"],
+        "category": listing["category"],
+        "style_tags": " ".join(listing["style_tags"]),
+        "description": listing["description"],
+        "colors": " ".join(listing["colors"]),
+        "brand": listing["brand"] or "",
+    }
+    tokens = {name: _tokenize_helper(text) for name, text in fields.items()}
+    score = 0
+    for word in query_words:
+        score += max(
+            (FIELD_WEIGHTS[name] for name, toks in tokens.items() if word in toks),
+            default=0,
+        )
+    return score
+
+
+RANKERS = {"keyword": _score_keyword, "weighted": _score_weighted}
+DEFAULT_RANKER = "weighted"
 
 
 # ── Tool 2: suggest_outfit ────────────────────────────────────────────────────

@@ -44,6 +44,7 @@ import config  # noqa: F401
 from flask import Flask, jsonify, request
 
 from agent import run_agent
+from tools import DEFAULT_RANKER, RANKERS
 from utils.data_loader import get_example_wardrobe
 
 app = Flask(__name__)
@@ -118,6 +119,11 @@ def ask():
     if not isinstance(wardrobe, dict):
         wardrobe = get_example_wardrobe()
 
+    ranker = payload.get("ranker", DEFAULT_RANKER)
+    if ranker not in RANKERS:
+        return jsonify({"error": f"'ranker' must be one of {sorted(RANKERS)}, "
+                                 f"got {ranker!r}"}), 400
+
     # A queued request should look like a queued request. Without this the
     # second caller just sits there, and "slow" and "waiting its turn" are
     # indistinguishable from the outside — which is how people conclude the
@@ -140,7 +146,7 @@ def ask():
     session = None
     with _one_at_a_time:
         try:
-            session = run_agent(query, wardrobe)
+            session = run_agent(query, wardrobe, ranker)
         except Exception as exc:  # noqa: BLE001 — a 500 with a sentence beats a hang
             failure = f"{type(exc).__name__}: {exc}"
 

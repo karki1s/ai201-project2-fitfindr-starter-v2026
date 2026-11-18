@@ -72,6 +72,7 @@ def search_listings(
     description: str,
     size: str | None = None,
     max_price: float | None = None,
+    ranker: str = "weighted",
 ) -> list[dict]:
     """
     Search a fixed catalogue of secondhand clothing listings.
@@ -83,8 +84,12 @@ def search_listings(
               "W30" for jeans. Omit to allow any size.
         max_price: highest price in US dollars, inclusive (30 allows a $30.00
                    item). Omit for no price limit.
+        ranker: "weighted" (default) ranks words found in the title or
+                category above words found only in the description, and
+                breaks ties by lower price. "keyword" counts every matching
+                word equally and keeps file order on ties.
 
-    Returns a list of listing dicts, best keyword match first. Each
+    Returns a list of listing dicts, best match first. Each
     has: id, title, description, category, style_tags (list of str), size,
     condition, price (float, USD), colors (list of str), brand (str or null —
     usually null), platform.
@@ -92,7 +97,7 @@ def search_listings(
     Returns an empty list [] when nothing matches. That is a normal result,
     not an error.
     """
-    return _search_listings_impl(description, size, max_price)
+    return _search_listings_impl(description, size, max_price, ranker)
 
 
 if __name__ == "__main__":
